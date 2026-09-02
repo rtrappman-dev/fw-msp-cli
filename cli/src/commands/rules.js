@@ -1,11 +1,32 @@
 const { getClient, resolveBoxGid } = require('../api/client');
 
 /**
+ * Build the documented box-scoped rule query.
+ */
+function buildRuleQuery(gid, query) {
+  const boxQuery = `box.id:${gid}`;
+  return query ? `${boxQuery} ${query}` : boxQuery;
+}
+
+/**
  * Fetch all rules for a box.
  */
-async function fetchAll(client, gid, apiParams = {}) {
-  const { data } = await client.get('/rules', { params: { gid, ...apiParams } });
+async function fetchAll(client, gid, query) {
+  const { data } = await client.get('/rules', {
+    params: { query: buildRuleQuery(gid, query) }
+  });
   return Array.isArray(data) ? data : (data.results || []);
+}
+
+/**
+ * Resolve an API rule ID within the selected box.
+ *
+ * Rule IDs are globally addressed UUIDs in the MSP API. The box GID is
+ * verified against the returned rule before the rule is used.
+ */
+function findRuleById(rules, id, gid) {
+  const ruleId = String(id);
+  return rules.find(r => r.id === ruleId && r.gid === gid);
 }
 
 /**
@@ -55,10 +76,13 @@ const Rules = {
     const gid = await resolveBoxGid(options.box, options);
     const client = getClient(options);
 
-    const apiParams = {};
+    let apiQuery;
     if (options.params) {
       try {
-        Object.assign(apiParams, JSON.parse(options.params));
+        const parsedParams = JSON.parse(options.params);
+        if (parsedParams.query !== undefined) {
+          apiQuery = parsedParams.query;
+        }
       } catch {
         console.error(JSON.stringify({ error: 'Invalid --params JSON' }));
         process.exit(1);
@@ -66,7 +90,7 @@ const Rules = {
     }
 
     try {
-      const all = await fetchAll(client, gid, apiParams);
+      const all = await fetchAll(client, gid, apiQuery);
       const filtered = applyFilters(all, options);
       console.log(JSON.stringify({ results: filtered, count: filtered.length }, null, 2));
     } catch (err) {
@@ -80,15 +104,13 @@ const Rules = {
 
     try {
       const all = await fetchAll(client, gid);
-      const numId = String(id);
-
-      // Match by numeric rule ID (last segment of composite id "gid:num")
-      const rule =
-        all.find(r => r.id === `${gid}:${numId}`) ||
-        all.find(r => r.id?.split(':').pop() === numId);
+      const rule = findRuleById(all, id, gid);
 
       if (!rule) {
-        console.error(JSON.stringify({ error: `Rule "${id}" not found.`, hint: 'Use fw rules list to see all rule IDs.' }));
+        console.error(JSON.stringify({
+          error: `Rule "${id}" not found in selected box.`,
+          hint: 'Use fw rules list to see rule IDs.'
+        }));
         process.exit(1);
       }
 
@@ -126,8 +148,20 @@ const Rules = {
   pause: async (id, options) => {
     const gid = await resolveBoxGid(options.box, options);
     const client = getClient(options);
+
     try {
-      const { data } = await client.post(`/rules/${gid}:${id}/pause`, {});
+      const all = await fetchAll(client, gid);
+      const rule = findRuleById(all, id, gid);
+
+      if (!rule) {
+        console.error(JSON.stringify({
+          error: `Rule "${id}" not found in selected box.`,
+          hint: 'Use fw rules list to see rule IDs.'
+        }));
+        process.exit(1);
+      }
+
+      const { data } = await client.post(`/rules/${encodeURIComponent(rule.id)}/pause`, {});
       console.log(JSON.stringify(data ?? { ok: true }, null, 2));
     } catch (err) {
       console.error(JSON.stringify({ error: 'Pause failed', status: err.response?.status, details: err.response?.data || err.message }));
@@ -137,8 +171,20 @@ const Rules = {
   resume: async (id, options) => {
     const gid = await resolveBoxGid(options.box, options);
     const client = getClient(options);
+
     try {
-      const { data } = await client.post(`/rules/${gid}:${id}/resume`, {});
+      const all = await fetchAll(client, gid);
+      const rule = findRuleById(all, id, gid);
+
+      if (!rule) {
+        console.error(JSON.stringify({
+          error: `Rule "${id}" not found in selected box.`,
+          hint: 'Use fw rules list to see rule IDs.'
+        }));
+        process.exit(1);
+      }
+
+      const { data } = await client.post(`/rules/${encodeURIComponent(rule.id)}/resume`, {});
       console.log(JSON.stringify(data ?? { ok: true }, null, 2));
     } catch (err) {
       console.error(JSON.stringify({ error: 'Resume failed', status: err.response?.status, details: err.response?.data || err.message }));
@@ -147,3 +193,5 @@ const Rules = {
 };
 
 module.exports = Rules;
+module.exports.buildRuleQuery = buildRuleQuery;
+module.exports.findRuleById = findRuleById;
