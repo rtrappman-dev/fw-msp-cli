@@ -18,6 +18,11 @@ function parseTime(timeStr) {
   return date.getTime() / 1000;
 }
 
+const buildFlowQuery = (gid, query) => {
+  const boxQuery = `box.id:${gid}`;
+  return query ? `${boxQuery} ${query}` : boxQuery;
+};
+
 const Flows = {
   report: async (options) => {
     const gid = await resolveBoxGid(options.box, options);
@@ -104,7 +109,7 @@ const Flows = {
     const gid = await resolveBoxGid(options.box, options);
     const client = getClient(options);
     
-    let apiParams = { gid };
+    let apiParams = {};
     let queryParts = [];
     
     // Build query from convenience flags
@@ -162,6 +167,11 @@ const Flows = {
         }
       });
     }
+
+    // GET /v2/flows is MSP-wide. Enforce the selected box using the
+    // documented flow search qualifier after all caller-provided filters
+    // have been applied, so raw params cannot remove the box boundary.
+    apiParams.query = buildFlowQuery(gid, apiParams.query);
 
     try {
       // Auto-pagination when limit > 500 or --all flag
@@ -278,3 +288,4 @@ function computeStats(flows) {
 }
 
 module.exports = Flows;
+module.exports.buildFlowQuery = buildFlowQuery;
