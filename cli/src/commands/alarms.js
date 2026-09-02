@@ -1,5 +1,10 @@
 const { getClient, getClientV1, resolveBoxGid } = require('../api/client');
 
+const buildAlarmQuery = (gid, query) => {
+  const boxQuery = `box.id:${gid}`;
+  return query ? `${boxQuery} ${query}` : boxQuery;
+};
+
 const Alarms = {
   archive: async (aid, options) => {
     const gid = await resolveBoxGid(options.box, options);
@@ -28,13 +33,12 @@ const Alarms = {
   list: async (options) => {
     const gid = await resolveBoxGid(options.box, options);
     const client = getClient(options);
-    
-    let apiParams = { gid };
-    
+
+    const apiParams = {};
+
     // Only pass through supported API parameters
     if (options.params) {
       const parsedParams = JSON.parse(options.params);
-      // Filter to only supported parameters (limit, cursor, etc.)
       const supportedParams = ['limit', 'cursor', 'query', 'groupBy', 'sortBy'];
       supportedParams.forEach(param => {
         if (parsedParams[param] !== undefined) {
@@ -42,6 +46,11 @@ const Alarms = {
         }
       });
     }
+
+    // GET /v2/alarms is MSP-wide. Enforce the selected box using the
+    // documented alarm search qualifier instead of an unsupported `gid`
+    // collection parameter.
+    apiParams.query = buildAlarmQuery(gid, apiParams.query);
 
     try {
       const { data } = await client.get('/alarms', { params: apiParams });
@@ -53,3 +62,4 @@ const Alarms = {
 };
 
 module.exports = Alarms;
+module.exports.buildAlarmQuery = buildAlarmQuery;
