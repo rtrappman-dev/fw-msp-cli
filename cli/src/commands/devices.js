@@ -4,7 +4,7 @@ const { getClient, resolveBoxGid } = require('../api/client');
  * Fetch all devices for a box (API returns a flat array, no pagination).
  */
 async function fetchAll(client, gid) {
-  const { data } = await client.get('/devices', { params: { gid } });
+  const { data } = await client.get('/devices', { params: { box: gid } });
   return Array.isArray(data) ? data : (data.results || []);
 }
 
