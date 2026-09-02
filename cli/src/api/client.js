@@ -2,6 +2,21 @@ const axios = require('axios');
 
 const getCleanDomain = (domain) => {
   const targetDomain = domain || process.env.FIREWALLA_MSP_ID || 'api.firewalla.net';
+  const invalidDomain = () => {
+    console.error(JSON.stringify({
+      error: "Invalid domain",
+      hint: "For security, only *.firewalla.net domains are allowed"
+    }));
+    process.exit(1);
+  };
+
+  // Accept only a hostname, optionally prefixed by http(s) and/or followed
+  // by a single trailing slash. Everything else is rejected before URL
+  // parsing so an explicit default port such as :443 cannot be normalized away.
+  if (!/^(?:https?:\/\/)?[A-Za-z0-9.-]+\/?$/i.test(targetDomain)) {
+    invalidDomain();
+  }
+
   const targetUrl = /^https?:\/\//i.test(targetDomain)
     ? targetDomain
     : `https://${targetDomain}`;
@@ -10,28 +25,13 @@ const getCleanDomain = (domain) => {
   try {
     url = new URL(targetUrl);
   } catch (_) {
-    console.error(JSON.stringify({
-      error: "Invalid domain",
-      hint: "For security, only *.firewalla.net domains are allowed"
-    }));
-    process.exit(1);
+    invalidDomain();
   }
 
   const hostname = url.hostname.toLowerCase();
 
   // Security: validate the parsed hostname, not the raw input, to prevent
   // URL parser confusion from redirecting the MSP token to an attacker host.
-  if (
-    url.protocol !== 'https:' &&
-    url.protocol !== 'http:'
-  ) {
-    console.error(JSON.stringify({
-      error: "Invalid domain",
-      hint: "For security, only *.firewalla.net domains are allowed"
-    }));
-    process.exit(1);
-  }
-
   if (
     url.username ||
     url.password ||
@@ -41,11 +41,7 @@ const getCleanDomain = (domain) => {
     url.hash ||
     (hostname !== 'api.firewalla.net' && !hostname.endsWith('.firewalla.net'))
   ) {
-    console.error(JSON.stringify({
-      error: "Invalid domain",
-      hint: "For security, only *.firewalla.net domains are allowed"
-    }));
-    process.exit(1);
+    invalidDomain();
   }
 
   return hostname;
