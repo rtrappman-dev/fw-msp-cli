@@ -153,7 +153,7 @@ rules
 
 rules
   .command('get <id>')
-  .description('Get a rule by its numeric ID')
+  .description('Get a rule by its API rule ID')
   .option('--box <name|gid>', 'Box Name or GID')
   .action((id, options) => {
     Rules.get(id, { ...options, ...program.opts() });
@@ -161,7 +161,7 @@ rules
 
 rules
   .command('pause <id>')
-  .description('Pause a rule by its numeric ID (requires API support)')
+  .description('Pause a rule by its API rule ID (requires API support)')
   .option('--box <name|gid>', 'Box Name or GID')
   .action((id, options) => {
     Rules.pause(id, { ...options, ...program.opts() });
@@ -169,7 +169,7 @@ rules
 
 rules
   .command('resume <id>')
-  .description('Resume a paused rule by its numeric ID (requires API support)')
+  .description('Resume a paused rule by its API rule ID (requires API support)')
   .option('--box <name|gid>', 'Box Name or GID')
   .action((id, options) => {
     Rules.resume(id, { ...options, ...program.opts() });
